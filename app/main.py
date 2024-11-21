@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     logger.info(f"Request: {request.method} {request.url}")
-    #check
+    #check 
     # Log request body if it's not binary
     if request.headers.get("content-type") and "multipart/form-data" not in request.headers.get("content-type"):
         try:
