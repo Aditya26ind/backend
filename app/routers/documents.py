@@ -19,6 +19,9 @@ async def upload_document(
     current_user: User = Depends(get_current_user)
 ):
     try:
+        import pdb
+        pdb.set_trace()
+        
         filename=file.filename
         # Read the file content and create a copy for post-upload processing
         file_bytes = await file.read()  # Read file content

@@ -50,12 +50,23 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def get_current_user(access_token: str = Cookie(None), db: Session = Depends(get_db)):
-    if not access_token:
+def get_current_user(authorization: str = Header(None), db: Session = Depends(get_db)):
+    if not authorization:
+        print("No Authorization header provided")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication token is missing"
+            detail="Authorization header missing"
         )
+
+    # Extract Bearer token
+    if not authorization.startswith("Bearer "):
+        print("Invalid Authorization header format")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Authorization header format"
+        )
+
+    access_token = authorization.split(" ")[1]  # Extract the token part
     
     # Remove 'Bearer ' prefix if present
     if access_token.startswith("Bearer "):
@@ -95,6 +106,14 @@ def login(response: Response, user: schemas.UserLogin, db: Session = Depends(get
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     
     access_token = create_access_token(data={"sub": db_user.username})
+    # response.set_cookie(
+    #     key="access_token",
+    #     value=f"Bearer {access_token}",
+    #     httponly=True, 
+    #     max_age=60 * 60 * 24,
+    #     secure=False,
+    #     samesite="none"
+    # )
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.get("/me")
