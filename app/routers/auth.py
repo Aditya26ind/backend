@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from fastapi.security import OAuth2PasswordBearer
-from fastapi import Cookie, Depends, HTTPException, Response, status,APIRouter
+from fastapi import Cookie, Depends, HTTPException, Response, status,APIRouter,Header
 from app import schemas
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
@@ -95,14 +95,6 @@ def login(response: Response, user: schemas.UserLogin, db: Session = Depends(get
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     
     access_token = create_access_token(data={"sub": db_user.username})
-    response.set_cookie(
-        key="access_token",
-        value=f"Bearer {access_token}",
-        httponly=True, 
-        max_age=60 * 60 * 24,
-        secure=False,
-        samesite="none"
-    )
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.get("/me")
@@ -111,36 +103,52 @@ def get_user_details(current_user: User = Depends(get_current_user)):
 
 
 @router.get("/check-auth")
-def check_auth(access_token: str = Cookie(None), db: Session = Depends(get_db)):
-    print(f"Received access_token: {access_token}")  # Log the cookie
+def check_auth(
+    authorization: str = Header(None),  # Extract the Authorization header
+    db: Session = Depends(get_db)
+):
+    if not authorization:
+        print("No Authorization header provided")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header missing"
+        )
 
-    if not access_token:
-        print("No access token provided")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    # Extract Bearer token
+    if not authorization.startswith("Bearer "):
+        print("Invalid Authorization header format")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Authorization header format"
+        )
 
-    token = access_token.split(" ")[1]  # Remove "Bearer" prefix
+    token = authorization.split(" ")[1]  # Extract the token part
     try:
+        # Decode the JWT token
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         print(f"Decoded payload: {payload}")  # Log payload
 
         username = payload.get("sub")
         if not username:
             print("Invalid token payload")
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token payload"
+            )
 
+        # Check if the user exists in the database
         user = db.query(User).filter(User.username == username).first()
         if not user:
             print("User not found in database")
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found"
+            )
     except JWTError as e:
         print(f"JWT decoding error: {e}")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token"
+        )
 
     return {"username": user.username, "id": user.id, "authenticated": True}
-
-
-@router.post("/logout")
-def logout(response: Response):
-    # Clear the access token cookie
-    response.delete_cookie(key="access_token")
-    return {"message": "Successfully logged out"}

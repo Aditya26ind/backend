@@ -8,10 +8,9 @@ from app.services.search import index_document
 from app.routers.auth import get_current_user
 import json
 from PyPDF2 import PdfReader
+import traceback
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
-
-import traceback
 
 @router.post("/upload")
 async def upload_document(
